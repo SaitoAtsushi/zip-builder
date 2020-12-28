@@ -13,7 +13,7 @@ zip-builder = {git = "https://github.com/SaitoAtsushi/zip-builder.git" }
 
 ## Example
 
-```
+```rust
 use std::fs::File;
 use zip_builder::Level;
 use zip_builder::Result;

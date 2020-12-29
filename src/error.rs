@@ -3,9 +3,15 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
+/// Represent error that occurred during archive generation.
 #[derive(Debug)]
 pub enum Error {
+    /// Writing error.
     IoError(std::io::Error),
+    /// Error during integer conversion.
+    ///
+    /// There is an upper limit to the size that can be stored in Zip.
+    /// You will get this error if you pass too large data.
     IntError(std::num::TryFromIntError),
 }
 

@@ -1,3 +1,17 @@
+//! This crate is to generate zip archive files.
+//!
+//! To generate a Zip archive, follow these steps:
+//!
+//! 1. Create [`ZipArchive`] structure by [`new`](ZipArchive::new) method
+//! 2. Add zip entry by [`add_entry`](ZipArchive::add_entry) method
+//! 3. Write ending data by [`flush`](ZipArchive::flush) method.
+//!
+//! Note the following
+//!
+//! - If the return value of a method is an error, the output data is incomplete.
+//! - If you do not call `flush` method, [`drop`](ZipArchive::drop) write ending data.
+//! - Failure of writing in `drop` will cause panic.
+
 use std::convert::TryFrom;
 use std::io::Write;
 use std::ops::Drop;
@@ -14,11 +28,16 @@ pub use error::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Represents complression level.
 #[derive(Eq, PartialEq, Clone, Copy)]
 pub enum Level {
+    /// Not compress. Store raw data.
     Raw,
+    /// Fast compress.
     Low,
+    /// Normal compress.
     Default,
+    /// Strong compress. Slowly.
     High,
 }
 
@@ -77,6 +96,8 @@ enum ZipState {
     Finished,
 }
 
+/// The main struct you will need to use in this library.
+
 pub struct ZipArchive<'a, T: Write + 'a> {
     state: ZipState,
     output: &'a mut T,
@@ -85,6 +106,7 @@ pub struct ZipArchive<'a, T: Write + 'a> {
 }
 
 impl<'a, T: Write + 'a> ZipArchive<'a, T> {
+    /// Create a new [`ZipArchive`] structure.
     pub fn new(output: &'a mut T) -> ZipArchive<'a, T> {
         ZipArchive {
             state: ZipState::Breathe,
@@ -109,6 +131,9 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
         Ok(u32::try_from(write_size)?)
     }
 
+    /// Add a entry to the zip.
+    ///
+    /// Level means compression level.
     pub fn add_entry(mut self, name: &str, content: &[u8], level: Level) -> Result<Self> {
         self.state = ZipState::Processing;
         if let Some(compression) = level.compression() {
@@ -148,6 +173,9 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
         Ok(u32::try_from(write_size)?)
     }
 
+    /// Write ending data.
+    ///
+    /// Specifically, central directory header (PK0102) and end of central directory record (PK0506).
     pub fn flush(mut self) -> Result<()> {
         self.state = ZipState::Processing;
         let entries = std::mem::take(&mut self.entries);
@@ -170,6 +198,9 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
 }
 
 impl<'a, T: Write + 'a> Drop for ZipArchive<'a, T> {
+    /// If flush method has be not called, this method write ending data.
+    /// But failing to write causes a panic.
+    /// It is recommended to always call [`flush`](ZipArchive::flush) explicitly.
     fn drop(&mut self) {
         if self.state == ZipState::Breathe {
             self.state = ZipState::Processing;

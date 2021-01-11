@@ -77,10 +77,12 @@ impl ZipEntry {
         method: u16,
         offset: u32,
     ) -> ZipEntry {
+        let mut hasher = CRC32::default();
+        hasher.write(uncompressed_content);
         ZipEntry {
             method,
             timestamp: DateTime::now().dos_time(),
-            checksum: uncompressed_content.iter().crc32(),
+            checksum: hasher.finish(),
             compressed_size: compressed_content.len() as u32,
             uncompressed_size: uncompressed_content.len() as u32,
             offset: offset,

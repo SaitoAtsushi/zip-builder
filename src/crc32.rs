@@ -1,3 +1,25 @@
+use std::default::Default;
+
+pub struct CRC32(u32);
+
+impl Default for CRC32 {
+  fn default() -> Self {
+    CRC32(0xFFFFFFFFu32)
+  }
+}
+
+impl CRC32 {
+  pub fn finish(&self) -> u32 {
+    !self.0
+  }
+
+  pub fn write(&mut self, bytes: &[u8]) {
+    self.0 = bytes.iter().fold(self.0, |crc, &byte| {
+      CRC_TABLE[(crc as u8 ^ byte) as usize] ^ (crc >> 8)
+    })
+  }
+}
+
 const fn make_crc_table() -> [u32; 256] {
   let mut table: [u32; 256] = [0; 256];
   let mut n = 0;
@@ -20,24 +42,14 @@ const fn make_crc_table() -> [u32; 256] {
 
 const CRC_TABLE: [u32; 256] = make_crc_table();
 
-pub trait CRC32 {
-  fn crc32(self) -> u32;
-}
-
-impl<'a, T: Iterator<Item = &'a u8> + 'a> CRC32 for T {
-  fn crc32(self) -> u32 {
-    !self.fold(0xFFFFFFFFu32, |crc, &byte| {
-      CRC_TABLE[(crc as u8 ^ byte) as usize] ^ (crc >> 8)
-    })
-  }
-}
-
 #[cfg(test)]
 mod test {
   use super::CRC32;
 
   fn crc_test(s: &str, crc: u32) {
-    assert_eq!(s.as_bytes().iter().crc32(), crc);
+    let mut hasher = CRC32::default();
+    hasher.write(s.as_bytes());
+    assert_eq!(hasher.finish(), crc);
   }
 
   #[test]

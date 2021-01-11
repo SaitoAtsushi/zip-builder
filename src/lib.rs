@@ -1,16 +1,35 @@
 //! This crate is to generate zip archive files.
 //!
-//! To generate a Zip archive, follow these steps:
+//! # ZIP generating steps
 //!
 //! 1. Create [`ZipArchive`] structure by [`new`](ZipArchive::new) method
 //! 2. Add zip entry by [`add_entry`](ZipArchive::add_entry) method
 //! 3. Write ending data by [`flush`](ZipArchive::flush) method.
 //!
-//! Note the following
+//! # Note
 //!
 //! - If the return value of a method is an error, the output data is incomplete.
 //! - If you do not call `flush` method, [`drop`](ZipArchive::drop) write ending data.
 //! - Failure of writing in `drop` will cause panic.
+//!
+//! # Example
+//!
+//! ```rust
+//! use std::fs::File;
+//! use zip_builder::Level;
+//! use zip_builder::Result;
+//! use zip_builder::ZipArchive;
+//!
+//! fn main() -> Result<()> {
+//!     let mut file = File::create("foo.zip").unwrap();
+//!     let zip_builder = ZipArchive::new(&mut file)
+//!         .add_entry("file1.txt", b"content", Level::Low)?
+//!         .add_entry("file2.txt", b"content", Level::Raw)?
+//!         .flush();
+//!
+//!     Ok(())
+//! }
+//! ```
 
 use std::convert::TryFrom;
 use std::io::Write;

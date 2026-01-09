@@ -83,7 +83,7 @@ fn year_from_days(days: u64) -> (u16, u16) {
 }
 
 const fn is_leap_year(year: u16) -> bool {
-    (year % 4 == 0) & ((year % 100 != 0) | (year % 400 == 0))
+    year.is_multiple_of(4) & (!year.is_multiple_of(100) | year.is_multiple_of(400))
 }
 
 const DAYS_IN_YEAR: [u16; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -119,12 +119,12 @@ impl From<&EpochTime> for DateTime {
         let (year, days) = year_from_days(rest);
         let (month, days) = month_from_days(days, is_leap_year(year));
         DateTime {
-            year: year,
-            month: month,
+            year,
+            month,
             day: days,
-            hour: hour,
-            minute: minute,
-            second: second,
+            hour,
+            minute,
+            second,
         }
     }
 }

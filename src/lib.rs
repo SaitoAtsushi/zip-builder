@@ -36,8 +36,8 @@ use std::io::Write;
 use std::ops::Drop;
 use std::str::FromStr;
 extern crate deflate;
-use deflate::deflate_bytes_conf;
 use deflate::Compression;
+use deflate::deflate_bytes_conf;
 mod crc32;
 use crc32::CRC32;
 mod time;
@@ -62,11 +62,7 @@ pub enum Level {
 
 impl Level {
     fn method(&self) -> u16 {
-        if *self == Level::Raw {
-            0
-        } else {
-            8
-        }
+        if *self == Level::Raw { 0 } else { 8 }
     }
     fn compression(&self) -> Option<Compression> {
         match self {
@@ -104,7 +100,7 @@ impl ZipEntry {
             checksum: hasher.finish(),
             compressed_size: compressed_content.len() as u32,
             uncompressed_size: uncompressed_content.len() as u32,
-            offset: offset,
+            offset,
             filename: String::from_str(filename).unwrap(),
         }
     }
@@ -118,7 +114,6 @@ enum ZipState {
 }
 
 /// The main struct you will need to use in this library.
-
 pub struct ZipArchive<'a, T: Write + 'a> {
     state: ZipState,
     output: &'a mut T,
@@ -138,18 +133,18 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
     }
 
     fn pk0304(output: &mut T, entry: &ZipEntry) -> Result<u32> {
-        let mut write_size = output.write(&0x04034b50u32.to_le_bytes())?;
-        write_size += output.write(&20u16.to_le_bytes())?;
-        write_size += output.write(&2048u16.to_le_bytes())?;
-        write_size += output.write(&entry.method.to_le_bytes())?;
-        write_size += output.write(&entry.timestamp.to_le_bytes())?;
-        write_size += output.write(&entry.checksum.to_le_bytes())?;
-        write_size += output.write(&entry.compressed_size.to_le_bytes())?;
-        write_size += output.write(&entry.uncompressed_size.to_le_bytes())?;
-        write_size += output.write(&u16::try_from(entry.filename.len())?.to_le_bytes())?;
-        write_size += output.write(&0u16.to_le_bytes())?;
-        write_size += output.write(entry.filename.as_bytes())?;
-        Ok(u32::try_from(write_size)?)
+        output.write_all(&0x04034b50u32.to_le_bytes())?;
+        output.write_all(&20u16.to_le_bytes())?;
+        output.write_all(&2048u16.to_le_bytes())?;
+        output.write_all(&entry.method.to_le_bytes())?;
+        output.write_all(&entry.timestamp.to_le_bytes())?;
+        output.write_all(&entry.checksum.to_le_bytes())?;
+        output.write_all(&entry.compressed_size.to_le_bytes())?;
+        output.write_all(&entry.uncompressed_size.to_le_bytes())?;
+        output.write_all(&u16::try_from(entry.filename.len())?.to_le_bytes())?;
+        output.write_all(&0u16.to_le_bytes())?;
+        output.write_all(entry.filename.as_bytes())?;
+        Ok(u32::try_from(30 + entry.filename.len())?)
     }
 
     /// Add a entry to the zip.
@@ -161,12 +156,14 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
             let compressed_body = deflate_bytes_conf(content, compression);
             let entry = ZipEntry::new(name, content, &compressed_body, level.method(), self.offset);
             self.offset += Self::pk0304(self.output, &entry)? as u32;
-            self.offset += self.output.write(compressed_body.as_slice())? as u32;
+            self.output.write_all(compressed_body.as_slice())?;
+            self.offset += compressed_body.len() as u32;
             self.entries.push(entry);
         } else {
-            let entry = ZipEntry::new(name, content, &content, level.method(), self.offset);
-            self.offset += Self::pk0304(self.output, &entry)? as u32;
-            self.offset += self.output.write(content)? as u32;
+            let entry = ZipEntry::new(name, content, content, level.method(), self.offset);
+            self.offset += Self::pk0304(self.output, &entry)?;
+            self.output.write_all(content)?;
+            self.offset += content.len() as u32;
             self.entries.push(entry);
         }
         self.state = ZipState::Breathe;
@@ -174,24 +171,24 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
     }
 
     fn pk0102(output: &mut T, entry: &ZipEntry) -> Result<u32> {
-        let mut write_size = output.write(&0x02014b50u32.to_le_bytes())?;
-        write_size += output.write(&20u16.to_le_bytes())?;
-        write_size += output.write(&20u16.to_le_bytes())?;
-        write_size += output.write(&2048u16.to_le_bytes())?;
-        write_size += output.write(&entry.method.to_le_bytes())?;
-        write_size += output.write(&entry.timestamp.to_le_bytes())?;
-        write_size += output.write(&entry.checksum.to_le_bytes())?;
-        write_size += output.write(&entry.compressed_size.to_le_bytes())?;
-        write_size += output.write(&entry.uncompressed_size.to_le_bytes())?;
-        write_size += output.write(&(u32::try_from(entry.filename.len())?).to_le_bytes())?;
-        write_size += output.write(&0u16.to_le_bytes())?;
-        write_size += output.write(&0u16.to_le_bytes())?;
-        write_size += output.write(&0u16.to_le_bytes())?;
-        write_size += output.write(&0u16.to_le_bytes())?;
-        write_size += output.write(&0u16.to_le_bytes())?;
-        write_size += output.write(&entry.offset.to_le_bytes())?;
-        write_size += output.write(entry.filename.as_bytes())?;
-        Ok(u32::try_from(write_size)?)
+        output.write_all(&0x02014b50u32.to_le_bytes())?;
+        output.write_all(&20u16.to_le_bytes())?;
+        output.write_all(&20u16.to_le_bytes())?;
+        output.write_all(&2048u16.to_le_bytes())?;
+        output.write_all(&entry.method.to_le_bytes())?;
+        output.write_all(&entry.timestamp.to_le_bytes())?;
+        output.write_all(&entry.checksum.to_le_bytes())?;
+        output.write_all(&entry.compressed_size.to_le_bytes())?;
+        output.write_all(&entry.uncompressed_size.to_le_bytes())?;
+        output.write_all(&(u32::try_from(entry.filename.len())?).to_le_bytes())?;
+        output.write_all(&0u16.to_le_bytes())?;
+        output.write_all(&0u16.to_le_bytes())?;
+        output.write_all(&0u16.to_le_bytes())?;
+        output.write_all(&0u16.to_le_bytes())?;
+        output.write_all(&0u16.to_le_bytes())?;
+        output.write_all(&entry.offset.to_le_bytes())?;
+        output.write_all(entry.filename.as_bytes())?;
+        Ok(u32::try_from(46 + entry.filename.len())?)
     }
 
     /// Write ending data.
@@ -202,17 +199,20 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
         let entries = std::mem::take(&mut self.entries);
         let top_of_central_directory = self.offset;
         for entry in entries.iter() {
-            self.offset += Self::pk0102(&mut self.output, entry)?;
+            self.offset += Self::pk0102(self.output, entry)?;
         }
         let size_of_the_central_directory = self.offset - top_of_central_directory;
-        self.output.write(&0x06054b50u32.to_le_bytes())?;
-        self.output.write(&0u32.to_le_bytes())?;
-        self.output.write(&(entries.len() as u16).to_le_bytes())?;
-        self.output.write(&(entries.len() as u16).to_le_bytes())?;
+        self.output.write_all(&0x06054b50u32.to_le_bytes())?;
+        self.output.write_all(&0u32.to_le_bytes())?;
         self.output
-            .write(&size_of_the_central_directory.to_le_bytes())?;
-        self.output.write(&top_of_central_directory.to_le_bytes())?;
-        self.output.write(&0u16.to_le_bytes())?;
+            .write_all(&(entries.len() as u16).to_le_bytes())?;
+        self.output
+            .write_all(&(entries.len() as u16).to_le_bytes())?;
+        self.output
+            .write_all(&size_of_the_central_directory.to_le_bytes())?;
+        self.output
+            .write_all(&top_of_central_directory.to_le_bytes())?;
+        self.output.write_all(&0u16.to_le_bytes())?;
         self.state = ZipState::Finished;
         Ok(())
     }
@@ -228,24 +228,24 @@ impl<'a, T: Write + 'a> Drop for ZipArchive<'a, T> {
             let entries = std::mem::take(&mut self.entries);
             let top_of_central_directory = self.offset;
             for entry in entries.iter() {
-                self.offset += Self::pk0102(&mut self.output, entry).unwrap();
+                self.offset += Self::pk0102(self.output, entry).unwrap();
             }
             let size_of_the_central_directory = self.offset - top_of_central_directory;
-            self.output.write(&0x06054b50u32.to_le_bytes()).unwrap();
-            self.output.write(&0u32.to_le_bytes()).unwrap();
+            self.output.write_all(&0x06054b50u32.to_le_bytes()).unwrap();
+            self.output.write_all(&0u32.to_le_bytes()).unwrap();
             self.output
-                .write(&(entries.len() as u16).to_le_bytes())
+                .write_all(&(entries.len() as u16).to_le_bytes())
                 .unwrap();
             self.output
-                .write(&(entries.len() as u16).to_le_bytes())
+                .write_all(&(entries.len() as u16).to_le_bytes())
                 .unwrap();
             self.output
-                .write(&size_of_the_central_directory.to_le_bytes())
+                .write_all(&size_of_the_central_directory.to_le_bytes())
                 .unwrap();
             self.output
-                .write(&top_of_central_directory.to_le_bytes())
+                .write_all(&top_of_central_directory.to_le_bytes())
                 .unwrap();
-            self.output.write(&0u16.to_le_bytes()).unwrap();
+            self.output.write_all(&0u16.to_le_bytes()).unwrap();
             self.state = ZipState::Finished;
         }
     }

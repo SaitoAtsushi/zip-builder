@@ -150,7 +150,10 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
     /// Add a entry to the zip.
     ///
     /// Level means compression level.
-    pub fn add_entry(mut self, name: &str, content: &[u8], level: Level) -> Result<Self> {
+    pub fn add_entry(&mut self, name: &str, content: &[u8], level: Level) -> Result<&mut Self> {
+        if self.state != ZipState::Breathe {
+            return Err(Error::AttemptWriteClosedArchive);
+        }
         self.state = ZipState::Processing;
         if let Some(compression) = level.compression() {
             let compressed_body = deflate_bytes_conf(content, compression);
@@ -194,7 +197,10 @@ impl<'a, T: Write + 'a> ZipArchive<'a, T> {
     /// Write ending data.
     ///
     /// Specifically, central directory header (PK0102) and end of central directory record (PK0506).
-    pub fn flush(mut self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
+        if self.state != ZipState::Breathe {
+            return Err(Error::AttemptWriteClosedArchive);
+        }
         self.state = ZipState::Processing;
         let entries = std::mem::take(&mut self.entries);
         let top_of_central_directory = self.offset;
@@ -224,29 +230,7 @@ impl<'a, T: Write + 'a> Drop for ZipArchive<'a, T> {
     /// It is recommended to always call [`flush`](ZipArchive::flush) explicitly.
     fn drop(&mut self) {
         if self.state == ZipState::Breathe {
-            self.state = ZipState::Processing;
-            let entries = std::mem::take(&mut self.entries);
-            let top_of_central_directory = self.offset;
-            for entry in entries.iter() {
-                self.offset += Self::pk0102(self.output, entry).unwrap();
-            }
-            let size_of_the_central_directory = self.offset - top_of_central_directory;
-            self.output.write_all(&0x06054b50u32.to_le_bytes()).unwrap();
-            self.output.write_all(&0u32.to_le_bytes()).unwrap();
-            self.output
-                .write_all(&(entries.len() as u16).to_le_bytes())
-                .unwrap();
-            self.output
-                .write_all(&(entries.len() as u16).to_le_bytes())
-                .unwrap();
-            self.output
-                .write_all(&size_of_the_central_directory.to_le_bytes())
-                .unwrap();
-            self.output
-                .write_all(&top_of_central_directory.to_le_bytes())
-                .unwrap();
-            self.output.write_all(&0u16.to_le_bytes()).unwrap();
-            self.state = ZipState::Finished;
+            self.flush().unwrap();
         }
     }
 }

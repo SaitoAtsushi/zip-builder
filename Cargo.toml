@@ -6,12 +6,7 @@ edition = "2024"
 readme = "readme.md"
 license = "MIT"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
 
-[dependencies.deflate]
-version = "1"
-default-features = false
-
-[profile.release]
-lto = true
-codegen-units = 1
+deflate = { version = "1", default-features = false }
+utcdatetime = { git = "https://github.com/SaitoAtsushi/utcdatetime.git", tag = "0.1" }

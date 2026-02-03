@@ -40,8 +40,7 @@ use deflate::Compression;
 use deflate::deflate_bytes_conf;
 mod crc32;
 use crc32::CRC32;
-mod time;
-use time::DateTime;
+use utcdatetime::DateTime;
 mod error;
 pub use error::Error;
 
